@@ -342,7 +342,7 @@ void GifSplitPalette(uint8_t* image, int numPixels, int treeNode, int treeLevel,
 
     int subPixelsB = numPixels-subPixelsA;
     pal->treeSplitElt[treeNode] = (uint8_t)splitCom;
-    pal->treeSplit[treeNode] = splitValue;
+    pal->treeSplit[treeNode] = (uint8_t)splitValue;
 
     GifSplitPalette(image,              subPixelsA, treeNode*2,   treeLevel+1, buildForDither, pal);
     GifSplitPalette(image+subPixelsA*4, subPixelsB, treeNode*2+1, treeLevel+1, buildForDither, pal);
@@ -449,7 +449,7 @@ void GifDitherImage( const uint8_t* lastFrame, const uint8_t* nextFrame, uint8_t
             int32_t bestDiff = 1000000;
             int32_t bestInd = kGifTransIndex;
 
-            // Search the palete
+            // Search the palette
             GifGetClosestPaletteColor(pPal, rr, gg, bb, &bestInd, &bestDiff, 1);
 
             // Write the result to the temp buffer
@@ -554,11 +554,13 @@ void GifThresholdImage( const uint8_t* lastFrame, const uint8_t* nextFrame, uint
 // one bit at a time
 typedef struct
 {
+    uint32_t chunkIndex;
+    uint8_t chunk[256];   // bytes are written in here until we have 256 of them, then written to the file
+
     uint8_t bitIndex;  // how many bits in the partial byte written so far
     uint8_t byte;      // current partial byte
 
-    uint32_t chunkIndex;
-    uint8_t chunk[256];   // bytes are written in here until we have 256 of them, then written to the file
+    uint8_t padding[2];    // make padding explicit
 } GifBitStatus;
 
 // insert a single bit
@@ -692,7 +694,7 @@ void GifWriteLzwImage(FILE* f, uint8_t* image, uint32_t left, uint32_t top,  uin
             uint8_t nextValue = image[(yy*width+xx)*4+3];
     #endif
 
-            // "loser mode" - no compression, every single code is followed immediately by a clear
+            // "worst possible mode" - no compression, every single code is followed immediately by a clear
             //WriteCode( f, stat, nextValue, codeSize );
             //WriteCode( f, stat, 256, codeSize );
 
@@ -754,6 +756,8 @@ typedef struct
     FILE* f;
     uint8_t* oldImage;
     bool firstFrame;
+
+    uint8_t padding[7];    // make padding explicit
 } GifWriter;
 
 // Creates a gif file.
@@ -806,7 +810,7 @@ bool GifBegin( GifWriter* writer, const char* filename, uint32_t width, uint32_t
         fputs("NETSCAPE2.0", writer->f); // yes, really
         fputc(3, writer->f); // 3 bytes of NETSCAPE2.0 data
 
-        fputc(1, writer->f); // JUST BECAUSE
+        fputc(1, writer->f); // this is the Netscape 2.0 sub-block ID and it must be 1, otherwise some viewers error
         fputc(0, writer->f); // loop infinitely (byte 0)
         fputc(0, writer->f); // loop infinitely (byte 1)
 
